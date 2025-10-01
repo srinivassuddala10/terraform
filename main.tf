@@ -3,7 +3,7 @@ provider "aws" {
 }
 
 resource "aws_s3_bucket" "my_bucket" {
-  bucket = "my-unique-bucket-12345"
+  bucket = "my-bucket"
 }
 
 resource "aws_instance" "my_ec2" {
