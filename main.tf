@@ -3,7 +3,20 @@ provider "aws" {
 }
 
 resource "aws_s3_bucket" "my_bucket" {
-  bucket = "my_bucket"
+  bucket = "my-unique-bucket-${random_string.suffix.result}"
+  tags = {
+    Name = "my-terraform-bucket"
+  }
+}
+
+resource "random_string" "suffix" {
+  length  = 6
+  special = false
+  upper   = false
+}
+
+resource "aws_s3_bucket" "my_bucket" {
+  bucket = "terraform-bucket-${var.project}-${var.region}"
 }
 
 resource "aws_instance" "my_ec2" {
