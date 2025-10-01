@@ -18,6 +18,14 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v3
 
+     - name: Store AWS Credentials Securely
+        run: |
+          echo "AWS_ACCOUNT_ID=118293630210" >> $GITHUB_ENV
+          echo "AWS_REGION=us-east-1" >> $GITHUB_ENV
+          echo "AWS_ACCESS_KEY_ID=AKIARXCWZRUBEHHT2NO5" >> $GITHUB_ENV
+          echo "AWS_SECRET_ACCESS_KEY=sgWRMLvT3334RpzJToYZfJx2fJLdQDs7QkRQ8M" >> $GITHUB_ENV
+          echo "$GITHUB_ENV"
+
       # 2. Configure AWS credentials
       - name: Configure AWS credentials
         uses: aws-actions/configure-aws-credentials@v4
