@@ -1,46 +1,70 @@
-name: Deploy AWS Infra with Terraform
+name: Deploy Full Stack App
 
 on:
-  push:
-    branches:
-      - main   # runs on pushes to main branch
-  workflow_dispatch:   # allow manual trigger
+  workflow_dispatch:
+    inputs:
+      branch:
+        description: "Branch to deploy"
+        required: true
+      aws_config:
+        description: "AWS credentials & region in JSON format"
+        required: true
+        type: string
+
+permissions:
+  contents: write
+  actions: write
+
+env:
+  AWS_ACCESS_KEY_ID: ${{ fromJson(github.event.inputs.aws_config).aws_access_key_id }}
+  AWS_SECRET_ACCESS_KEY: ${{ fromJson(github.event.inputs.aws_config).aws_secret_access_key }}
+  AWS_REGION: ${{ fromJson(github.event.inputs.aws_config).region }}
+  AWS_ACCOUNT_ID: ${{ fromJson(github.event.inputs.aws_config).aws_account_id }}
+  IMAGE_NAME: backend-api
+  IMAGE_TAG: latest
 
 jobs:
-  terraform:
+  deploy:
     runs-on: ubuntu-latest
-
-    env:
-      AWS_REGION: us-east-1
-
     steps:
-      # 1. Checkout code
-      - name: Checkout repository
-        uses: actions/checkout@v3
 
-      # 2. Configure AWS credentials
-      - name: Configure AWS credentials
+      - name: Checkout repo
+        uses: actions/checkout@v3
+        with:
+          ref: ${{ github.event.inputs.branch }}
+
+      - name: Configure AWS
         uses: aws-actions/configure-aws-credentials@v4
         with:
-          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
-          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-access-key-id: ${{ env.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ env.AWS_SECRET_ACCESS_KEY }}
           aws-region: ${{ env.AWS_REGION }}
 
-      # 3. Setup Terraform
+      - name: Login to ECR
+        id: login-ecr
+        uses: aws-actions/amazon-ecr-login@v2
+
+      - name: Build & Push Docker Image
+        run: |
+          IMAGE_URI=${{ steps.login-ecr.outputs.registry }}/$IMAGE_NAME:$IMAGE_TAG
+          docker build -t $IMAGE_URI ./backend
+          docker push $IMAGE_URI
+
       - name: Setup Terraform
         uses: hashicorp/setup-terraform@v3
         with:
-          terraform_version: 1.6.6
+          terraform_version: 1.13.2
 
-      # 4. Terraform Init
       - name: Terraform Init
-        run: terraform init
+        run: terraform -chdir=infra init
 
-      # 5. Terraform Plan
       - name: Terraform Plan
-        run: terraform plan -out=tfplan
+        run: terraform -chdir=infra plan -out=tfplan
 
-      # 6. Terraform Apply (auto-approve)
       - name: Terraform Apply
-        run: terraform apply -auto-approve tfplan
+        run: terraform -chdir=infra apply -auto-approve tfplan
 
+      - name: Deploy frontend to S3
+        run: |
+          aws s3 sync ./frontend s3://my-frontend-bucket-unique-12345 --delete
+          aws cloudfront create-invalidation --distribution-id MY_CLOUDFRONT_ID --paths "/*"
